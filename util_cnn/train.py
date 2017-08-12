@@ -93,7 +93,8 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
     total_trained = 0
 
     cnn.train()
-    cnn.cuda()
+    if torch.cuda.is_available():
+        cnn.cuda()
 
     for i in range(0, len(train_files), bs):
         t0 = perf_counter()
@@ -102,8 +103,12 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
 
         images, labels = queue.get()
 
-        images = torch.autograd.Variable(images.cuda())
-        labels = torch.autograd.Variable(torch.LongTensor(labels).cuda())
+        images = torch.autograd.Variable(images)
+        labels = torch.autograd.Variable(torch.LongTensor(labels))
+
+        if torch.cuda.is_available():
+            images = images.cuda()
+            labels = labels.cuda()
 
         t = time_logging.start()
 
@@ -172,14 +177,16 @@ def evaluate(model, files):
         batcher.start()
 
     cnn.eval()
-    cnn.cuda()
+    if torch.cuda.is_available():
+        cnn.cuda()
 
     all_outputs = []
 
     for i in range(0, len(files), bs):
         gc.collect()
         images = queue.get()
-        images = images.cuda()
+        if torch.cuda.is_available():
+            images = images.cuda()
 
         outputs = model.evaluate(images)
 
@@ -278,7 +285,8 @@ def train(args):
     # Optimizer
     optimizer = model.get_optimizer()
     criterion = model.get_criterion()
-    criterion.cuda()
+    if torch.cuda.is_available():
+        criterion.cuda()
 
     for param_group in optimizer.param_groups:
         param_group['lr'] = model.get_learning_rate(args.start_epoch)
