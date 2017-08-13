@@ -127,8 +127,8 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         total_correct += correct
         total_trained += j - i
 
-        logger.info("[%d|%d/%d] Loss=%.2f <Loss>=%.2f Accuracy=%d/%d <Accuracy>=%.2f%% Queue=%d Memory=%s Time=%.2fs",
-            epoch, i, len(train_files),
+        logger.info("[%d.%d|%d/%d] Loss=%.2f <Loss>=%.2f Accuracy=%d/%d <Accuracy>=%.2f%% Queue=%d Memory=%s Time=%.2fs",
+            epoch, 100 * i // len(train_files), i, len(train_files),
             loss_, np.mean(losses),
             correct, j-i, 100 * total_correct / total_trained,
             queue.qsize(),
@@ -144,7 +144,7 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
     return (np.mean(losses), total_correct / total_trained)
 
 
-def evaluate(model, files):
+def evaluate(model, files, epoch=0):
     cnn = model.get_cnn()
     bs = model.get_batch_size()
     logger = logging.getLogger("trainer")
@@ -192,8 +192,8 @@ def evaluate(model, files):
 
         all_outputs.append(outputs)
 
-        logger.info("Evaluation [%d/%d] Memory=%s Queue=%d",
-            i, len(files),
+        logger.info("Evaluation [%d.%d|%d/%d] Memory=%s Queue=%d",
+            epoch, 100 * i // len(files), i, len(files),
             gpu_memory.format_memory(gpu_memory.used_memory()),
             queue.qsize())
 
@@ -321,7 +321,7 @@ def train(args):
 
         if epoch % args.eval_each == args.eval_each - 1:
             for i, (data, stat) in enumerate(zip(eval_datas, statistics_eval)):
-                outputs = evaluate(model, data.files)
+                outputs = evaluate(model, data.files, epoch)
                 save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
                 correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
                 logger.info("Evaluation accuracy %d / %d = %.2f%%", correct, len(data.labels), 100 * correct / len(data.labels))
