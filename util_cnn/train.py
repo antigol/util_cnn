@@ -74,8 +74,6 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
             s = 0
 
             for i in range(0, len(train_files), bs):
-                s += 1
-
                 if s % self.n == self.i:
                     j = min(i + bs, len(train_files))
                     gc.collect()
@@ -83,6 +81,7 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
                     labels = [train_labels[g] for g in indicies[i:j]]
 
                     queue.put((images, labels))
+                s += 1
             event_done.wait()
 
     for i in range(AMOUNT_OF_PROCESS):
@@ -163,14 +162,13 @@ def evaluate(model, files, epoch=0):
             s = 0
 
             for i in range(0, len(files), bs):
-                s += 1
-
                 if s % self.n == self.i:
                     j = min(i + bs, len(files))
                     gc.collect()
                     images = model.load_eval_files(files[i:j])
 
-                    queue.put(images)
+                    queue.put((s, images))
+                s += 1
             event_done.wait()
 
     for i in range(AMOUNT_OF_PROCESS):
@@ -181,17 +179,17 @@ def evaluate(model, files, epoch=0):
     if torch.cuda.is_available():
         cnn.cuda()
 
-    all_outputs = []
+    all_outputs = [None] * len(range(0, len(files), bs))
 
     for i in range(0, len(files), bs):
         gc.collect()
-        images = queue.get()
+        s, images = queue.get()
         if torch.cuda.is_available():
             images = images.cuda()
 
         outputs = model.evaluate(images)
 
-        all_outputs.append(outputs)
+        all_outputs[s] = outputs
 
         logger.info("Evaluation [%d.%.2d|%d/%d] Memory=%s Queue=%d",
             epoch, 100 * i // len(files), i, len(files),
@@ -266,7 +264,10 @@ def train(args):
     logger.info("There is %d parameters to optimize", sum([x.numel() for x in cnn.parameters()]))
 
     if args.restore_path is not None:
-        checkpoint = torch.load(os.path.join(args.restore_path, "model.pkl"))
+        restore_path = shutil.copy2(
+            os.path.join(args.restore_path, "model.pkl"),
+            os.path.join(args.log_dir, "model.pkl"))
+        checkpoint = torch.load(restore_path)
         args.start_epoch = checkpoint['epoch']
         cnn.load_state_dict(checkpoint['state_dict'])
         logger.info("Restoration from file %s", os.path.join(args.restore_path, "model.pkl"))
