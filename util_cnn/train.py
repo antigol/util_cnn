@@ -9,6 +9,7 @@ import random
 import numpy as np
 import torch
 import gc
+import shutil
 from time import perf_counter
 from util_cnn import gpu_memory
 from util_cnn import time_logging
@@ -127,7 +128,7 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         total_correct += correct
         total_trained += j - i
 
-        logger.info("[%d.%d|%d/%d] Loss=%.2f <Loss>=%.2f Accuracy=%d/%d <Accuracy>=%.2f%% Queue=%d Memory=%s Time=%.2fs",
+        logger.info("[%d.%.2d|%d/%d] Loss=%.2f <Loss>=%.2f Accuracy=%d/%d <Accuracy>=%.2f%% Queue=%d Memory=%s Time=%.2fs",
             epoch, 100 * i // len(train_files), i, len(train_files),
             loss_, np.mean(losses),
             correct, j-i, 100 * total_correct / total_trained,
@@ -192,7 +193,7 @@ def evaluate(model, files, epoch=0):
 
         all_outputs.append(outputs)
 
-        logger.info("Evaluation [%d.%d|%d/%d] Memory=%s Queue=%d",
+        logger.info("Evaluation [%d.%.2d|%d/%d] Memory=%s Queue=%d",
             epoch, 100 * i // len(files), i, len(files),
             gpu_memory.format_memory(gpu_memory.used_memory()),
             queue.qsize())
@@ -256,7 +257,8 @@ def train(args):
 
     ############################################################################
     # Import model
-    module = import_module(args.model_path)
+    model_path = shutil.copy2(args.model_path, os.path.join(args.log_dir, "model.py"))
+    module = import_module(model_path)
     model = module.MyModel()
     model.initialize(len(classes))
     cnn = model.get_cnn()
@@ -304,6 +306,9 @@ def train(args):
         time_logging.clear()
         t = time_logging.start()
 
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = model.get_learning_rate(epoch)
+
         avg_loss, accuracy = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, criterion)
         statistics_train.append([epoch, avg_loss, accuracy])
 
@@ -344,7 +349,7 @@ def main():
     parser.add_argument("--eval_csv_path", type=str, nargs="+")
     parser.add_argument("--eval_each", type=int, default=1)
 
-    parser.add_argument("--gpu", type=int, default=0)
+    # parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument("--log_dir", type=str, required=True)
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--restore_path", type=str)
