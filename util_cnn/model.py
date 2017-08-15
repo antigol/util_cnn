@@ -11,7 +11,7 @@ class Model:
         """
         raise NotImplementedError
 
-    def get_batch_size(self):
+    def get_batch_size(self, epoch=None):
         raise NotImplementedError
 
     def get_learning_rate(self, epoch):

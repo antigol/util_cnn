@@ -55,7 +55,7 @@ def load_data(csv_file, files_pattern, classes=None):
 
 def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion):
     cnn = model.get_cnn()
-    bs = model.get_batch_size()
+    bs = model.get_batch_size(epoch)
     logger = logging.getLogger("trainer")
 
     indicies = list(range(len(train_files)))
@@ -101,6 +101,8 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         gc.collect()
         j = min(i + bs, len(train_files))
 
+        t = time_logging.start()
+
         images, labels = queue.get()
 
         images = torch.autograd.Variable(images)
@@ -110,7 +112,7 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
             images = images.cuda()
             labels = labels.cuda()
 
-        t = time_logging.start()
+        t = time_logging.end("batch", t)
 
         optimizer.zero_grad()
         outputs = cnn(images)
