@@ -10,7 +10,7 @@ class Arguments:
         self.number_of_epochs = None
         self.start_epoch = None
         self.eval_each = None
-        self.gpu = None
+        # self.gpu = None
         self.eval_data_path = None
         self.eval_csv_path = None
         self.restore_path = None
@@ -50,7 +50,7 @@ def main():
     args.number_of_epochs = main_args.number_of_epochs
     args.start_epoch = 0
     args.eval_each = main_args.eval_each
-    args.gpu = main_args.gpu
+    # args.gpu = main_args.gpu
     args.eval_data_path = main_args.eval_data_path
     args.eval_csv_path = main_args.eval_csv_path
     args.restore_path = None
