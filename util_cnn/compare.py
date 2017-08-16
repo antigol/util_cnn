@@ -1,5 +1,6 @@
 # pylint: disable=C,R
 import os
+import sys
 from util_cnn.train import train
 import argparse
 import numpy as np
@@ -29,7 +30,7 @@ def main():
     parser.add_argument("--eval_csv_path", type=str, nargs="*", required=True)
     parser.add_argument("--eval_each", type=int, default=1)
 
-    parser.add_argument("--gpu", type=int, default=0)
+    # parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument("--log_dir", type=str, required=True)
     parser.add_argument("--model_path", type=str, nargs="+", required=True)
     parser.add_argument("--repeat", type=int, required=True)
@@ -40,6 +41,9 @@ def main():
         os.mkdir(main_args.log_dir)
     except OSError:
         pass
+
+    with open(os.path.join(main_args.log_dir, "commands.txt"), "at") as f:
+        f.write(" ".join(['\"' + a + '\"' if " " in a else a for a in sys.argv]) + "\n")
 
     args = Arguments()
 
