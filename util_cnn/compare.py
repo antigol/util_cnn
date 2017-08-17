@@ -43,7 +43,7 @@ def main():
         pass
 
     with open(os.path.join(main_args.log_dir, "commands.txt"), "at") as f:
-        f.write(" ".join(['\"' + a + '\"' if " " in a else a for a in sys.argv]) + "\n")
+        f.write(" ".join(['\"' + a + '\"' if " " in a or "*" in a else a for a in sys.argv]) + "\n")
 
     args = Arguments()
 
