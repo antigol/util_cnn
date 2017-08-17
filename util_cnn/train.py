@@ -293,9 +293,6 @@ def train(args):
     if torch.cuda.is_available():
         criterion.cuda()
 
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = model.get_learning_rate(args.start_epoch)
-
     if args.restore_path is not None:
         checkpoint = torch.load(os.path.join(args.restore_path, "model.pkl"))
         optimizer.load_state_dict(checkpoint['optimizer'])
@@ -309,8 +306,9 @@ def train(args):
         time_logging.clear()
         t = time_logging.start()
 
+        lr = model.get_learning_rate(epoch)
         for param_group in optimizer.param_groups:
-            param_group['lr'] = model.get_learning_rate(epoch)
+            param_group['lr'] = lr
 
         avg_loss, accuracy = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, criterion)
         statistics_train.append([epoch, avg_loss, accuracy])
