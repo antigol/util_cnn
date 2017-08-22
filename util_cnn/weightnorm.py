@@ -3,7 +3,7 @@
 Like Batch Normalization but
 
 - only compute the second moment (not the mean and not the variance)
-- can be enable/disable via a attribute called enabled
+- can be disabled by setting momentum to zero
 - when disabled it uses only the running_moment, not the actual moment
 """
 import torch
@@ -14,7 +14,6 @@ class WeightNorm(torch.nn.Module):
     def __init__(self, num_features, eps=1e-5, momentum=0.1):
         super().__init__()
 
-        self.enabled = True
         self.num_features = num_features
 
         self.eps = eps
@@ -25,7 +24,7 @@ class WeightNorm(torch.nn.Module):
         '''
         :param x: [batch, feature, ...]
         '''
-        if self.training and self.enabled:
+        if self.training and self.momentum > 0:
             y = x.data ** 2
             y = y.view(x.size(0), self.num_features, -1).mean(-1).mean(0)  # [feature]
             self.running_moment = (1 - self.momentum) * self.running_moment + self.momentum * y  # pylint: disable=W0201
@@ -35,10 +34,10 @@ class WeightNorm(torch.nn.Module):
         return x
 
     @staticmethod
-    def toggle_all(net, enabled):
+    def set_all_momentum(net, momentum):
         for module in net.modules():
             if isinstance(module, WeightNorm):
-                module.enabled = enabled
+                module.momentum = momentum
 
 
 def test_batchnorm():
@@ -46,9 +45,9 @@ def test_batchnorm():
 
     x = torch.autograd.Variable(torch.randn(16, 4, 10, 10, 10))
 
-    bn.enabled = True
+    bn.momentum = 0.1
     bn(x)
     bn(x)
 
-    bn.enabled = False
+    bn.momentum = 0
     bn(x)
