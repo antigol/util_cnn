@@ -20,6 +20,13 @@ class AccBatchNorm(torch.nn.Module):
         self.register_buffer('running_mean', torch.ones(self.num_features))
         self.register_buffer('running_var', torch.ones(self.num_features))
 
+    def __repr__(self):
+        return "{} (num_features={}, eps={}, momentum={})".format(
+            self.__class__.__name__,
+            self.num_features,
+            self.eps,
+            self.momentum)
+
     def forward(self, x):  # pylint: disable=W0221
         '''
         :param x: [batch, feature, ...]
