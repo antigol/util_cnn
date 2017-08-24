@@ -39,3 +39,6 @@ class Model:
         x = torch.autograd.Variable(x, volatile=True)
         y = self.get_cnn()(x)
         return y.data.cpu().numpy()
+
+    def training_done(self, avg_loss, accuracy):
+        pass

@@ -313,6 +313,8 @@ def train(args):
         avg_loss, accuracy = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, criterion)
         statistics_train.append([epoch, avg_loss, accuracy])
 
+        model.training_done(avg_loss, accuracy)
+
         time_logging.end("training epoch", t)
         logger.info("%s", time_logging.text_statistics())
 
