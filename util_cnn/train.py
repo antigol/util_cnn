@@ -129,7 +129,7 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         total_correct += correct
         total_trained += j - i
 
-        logger.info("[%d.%.2d|%d/%d] Loss=%.2f <Loss>=%.2f Accuracy=%d/%d <Accuracy>=%.2f%% Queue=%d Memory=%s Time=%.2fs",
+        logger.info("[%d.%.2d|%d/%d] Loss=%.1e <Loss>=%.1e Accuracy=%d/%d <Accuracy>=%.2f%% Queue=%d Memory=%s Time=%.2fs",
             epoch, 100 * i // len(train_files), i, len(train_files),
             loss_, np.mean(losses),
             correct, j-i, 100 * total_correct / total_trained,

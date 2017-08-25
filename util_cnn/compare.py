@@ -92,11 +92,12 @@ def main():
             xx.append(x)
             yy.append(y)
 
+            np.save(os.path.join(model_dir, "statistics_train.npy"), np.array(xx))
+            np.save(os.path.join(model_dir, "statistics_eval.npy"), np.array(yy))
+
         xx = np.array(xx) # [repeat, train_type,           row, column]
         yy = np.array(yy) # [repeat, train_type, val_type, row, column]
 
-        np.save(os.path.join(model_dir, "statistics_train.npy"), xx)
-        np.save(os.path.join(model_dir, "statistics_eval.npy"), yy)
         xxx.append(xx)
         yyy.append(yy)
 
