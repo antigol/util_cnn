@@ -17,7 +17,7 @@ class AccBatchNorm(torch.nn.Module):
 
         self.eps = eps
         self.momentum = momentum
-        self.register_buffer('running_mean', torch.ones(self.num_features))
+        self.register_buffer('running_mean', torch.zeros(self.num_features))
         self.register_buffer('running_var', torch.ones(self.num_features))
 
     def __repr__(self):
