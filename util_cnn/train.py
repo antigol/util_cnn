@@ -332,8 +332,19 @@ def train(args):
                 outputs = evaluate(model, data.files, epoch)
                 save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
                 correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
-                logger.info("Evaluation accuracy %d / %d = %.2f%%", correct, len(data.labels), 100 * correct / len(data.labels))
-                stat.append([epoch, correct / len(data.labels)])
+                criterion.cpu()
+                loss = criterion(
+                    torch.autograd.Variable(torch.FloatTensor(outputs)),
+                    torch.autograd.Variable(torch.LongTensor(data.labels))
+                    ).data[0]
+                if torch.cuda.is_available():
+                    criterion.cuda()
+                logger.info("Evaluation accuracy %d / %d = %.2f%%, Loss = %1e",
+                    correct,
+                    len(data.labels), 100 * correct / len(data.labels),
+                    loss
+                    )
+                stat.append([epoch, loss, correct / len(data.labels)])
 
     statistics_train = np.array(statistics_train)
     np.save(os.path.join(args.log_dir, "statistics_train.npy"), statistics_train)
