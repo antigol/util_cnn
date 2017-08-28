@@ -108,8 +108,8 @@ def main():
     # np.save(os.path.join(main_args.log_dir, "statistics_eval.npy"), yyy)
 
     if yyy.shape[-1] > 0:
-        eval_accuracies = np.mean(yyy, axis=1)[:, :, :, -1, 1] # [model, train_type, val_type]
-        eval_accuracies_std = np.std(yyy, axis=1)[:, :, :, -1, 1] # [model, train_type, val_type]
+        eval_accuracies = np.mean(yyy, axis=1)[:, :, :, -1, 2] # [model, train_type, val_type]
+        eval_accuracies_std = np.std(yyy, axis=1)[:, :, :, -1, 2] # [model, train_type, val_type]
 
         for i, model in enumerate(main_args.model_path):
             name = os.path.splitext(os.path.basename(model))[0]
