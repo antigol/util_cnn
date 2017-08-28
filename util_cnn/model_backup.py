@@ -39,6 +39,8 @@ class ModelBackup(Model):
         return self.cnn
 
     def get_learning_rate(self, epoch):
+        logger = logging.getLogger("trainer")
+        logger.info("[%d] Learning rate set to %.1e", epoch, self.learning_rate)
         return self.learning_rate
 
     def get_optimizer(self):
