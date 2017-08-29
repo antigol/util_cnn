@@ -10,6 +10,7 @@ class Arguments:
         self.number_of_epochs = None
         self.start_epoch = None
         self.eval_each = None
+        self.number_of_classes = None
         # self.gpu = None
         self.eval_data_path = None
         self.eval_csv_path = None

@@ -29,7 +29,7 @@ class Dataset:
         self.ids = ids
         self.labels = labels
 
-def load_data(csv_file, files_pattern, classes=None):
+def load_data_with_csv(csv_file, files_pattern, classes=None):
     labels = {}
 
     with open(csv_file, 'rt') as file:
@@ -51,6 +51,15 @@ def load_data(csv_file, files_pattern, classes=None):
     labels = [classes.index(x) for x in labels]
 
     return Dataset(files, ids, labels), classes
+
+
+def load_data(files_pattern):
+    files = glob.glob(files_pattern)
+    random.shuffle(files)
+
+    ids = [file.split("/")[-1].split(".")[0] for file in files]
+
+    return Dataset(files, ids, None)
 
 
 def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion):
@@ -205,6 +214,9 @@ def evaluate(model, files, epoch=0):
 
 
 def save_evaluation(eval_ids, logits, labels, log_dir, number):
+    if labels is None:
+        labels = [-1] * len(logits)
+
     logits = np.array(logits)
     labels = np.array(labels)
     filename = os.path.join(log_dir, "eval{}.csv".format(number))
@@ -244,16 +256,28 @@ def train(args):
     eval_datas = []
 
     if args.train_csv_path is not None or args.train_data_path is not None:
-        train_data, classes = load_data(args.train_csv_path, args.train_data_path, classes)
+        train_data, classes = load_data_with_csv(args.train_csv_path, args.train_data_path, classes)
         logger.info("%s=%d training files", "+".join([str(train_data.labels.count(x)) for x in set(train_data.labels)]), len(train_data.files))
 
-    if args.eval_data_path is not None or args.eval_csv_path is not None:
+    if args.eval_data_path is not None and args.eval_csv_path is not None:
         assert len(args.eval_data_path) == len(args.eval_csv_path)
 
         for csv_file, pattern in zip(args.eval_csv_path, args.eval_data_path):
-            eval_data, classes = load_data(csv_file, pattern, classes)
+            eval_data, classes = load_data_with_csv(csv_file, pattern, classes)
             eval_datas.append(eval_data)
             logger.info("%s=%d evaluation files", "+".join([str(eval_data.labels.count(x)) for x in set(eval_data.labels)]), len(eval_data.files))
+    elif args.eval_data_path is not None and args.eval_csv_path is None:
+        for pattern in args.eval_data_path:
+            eval_data = load_data(pattern)
+            eval_datas.append(eval_data)
+            logger.info("%d evaluation files", len(eval_data.files))
+    elif args.eval_data_path is None and args.eval_csv_path is None:
+        pass
+    else:
+        raise AssertionError("eval_data_path or eval_csv_path missing ?")
+
+    if args.number_of_classes is not None and classes is None:
+        classes = list(range(args.number_of_classes))
 
     ############################################################################
     # Import model
@@ -282,8 +306,9 @@ def train(args):
         for i, data in enumerate(eval_datas):
             outputs = evaluate(model, data.files)
             save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
-            correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
-            logger.info("%d / %d = %.2f%%", correct, len(data.labels), 100 * correct / len(data.labels))
+            if data.labels is not None:
+                correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
+                logger.info("%d / %d = %.2f%%", correct, len(data.labels), 100 * correct / len(data.labels))
         return
 
     ############################################################################
@@ -353,7 +378,7 @@ def train(args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--number_of_epochs", type=int, required=True)
+    parser.add_argument("--number_of_epochs", type=int)
     parser.add_argument("--start_epoch", type=int, default=0)
 
     parser.add_argument("--train_data_path", type=str)
@@ -362,6 +387,8 @@ def main():
     parser.add_argument("--eval_data_path", type=str, nargs="+")
     parser.add_argument("--eval_csv_path", type=str, nargs="+")
     parser.add_argument("--eval_each", type=int, default=1)
+
+    parser.add_argument("--number_of_classes", type=int)
 
     # parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument("--log_dir", type=str, required=True)
