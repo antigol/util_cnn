@@ -15,7 +15,6 @@ from util_cnn import gpu_memory
 from util_cnn import time_logging
 
 QUEUE_SIZE = 4
-AMOUNT_OF_PROCESS = 4
 
 def import_module(path):
     file_name = os.path.basename(path)
@@ -62,7 +61,7 @@ def load_data(files_pattern):
     return Dataset(files, ids, None)
 
 
-def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion):
+def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion, number_of_process):
     cnn = model.get_cnn()
     bs = model.get_batch_size(epoch)
     logger = logging.getLogger("trainer")
@@ -93,8 +92,8 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
                 s += 1
             event_done.wait()
 
-    for i in range(AMOUNT_OF_PROCESS):
-        batcher = Batcher(AMOUNT_OF_PROCESS, i)
+    for i in range(number_of_process):
+        batcher = Batcher(number_of_process, i)
         batcher.start()
 
     losses = []
@@ -155,7 +154,7 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
     return (np.mean(losses), total_correct / total_trained)
 
 
-def evaluate(model, files, epoch=0):
+def evaluate(model, files, epoch=0, number_of_process=1):
     cnn = model.get_cnn()
     bs = model.get_batch_size()
     logger = logging.getLogger("trainer")
@@ -182,8 +181,8 @@ def evaluate(model, files, epoch=0):
                 s += 1
             event_done.wait()
 
-    for i in range(AMOUNT_OF_PROCESS):
-        batcher = Batcher(AMOUNT_OF_PROCESS, i)
+    for i in range(number_of_process):
+        batcher = Batcher(number_of_process, i)
         batcher.start()
 
     cnn.eval()
@@ -304,7 +303,7 @@ def train(args):
         if args.restore_path is None:
             logger.info("Evalutation with randomly initialized parameters")
         for i, data in enumerate(eval_datas):
-            outputs = evaluate(model, data.files)
+            outputs = evaluate(model, data.files, number_of_process=args.number_of_process)
             save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
             if data.labels is not None:
                 correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
@@ -335,7 +334,7 @@ def train(args):
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
 
-        avg_loss, accuracy = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, criterion)
+        avg_loss, accuracy = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, criterion, args.number_of_process)
         statistics_train.append([epoch, avg_loss, accuracy])
 
         model.training_done(avg_loss, accuracy)
@@ -354,7 +353,7 @@ def train(args):
 
         if epoch % args.eval_each == args.eval_each - 1:
             for i, (data, stat) in enumerate(zip(eval_datas, statistics_eval)):
-                outputs = evaluate(model, data.files, epoch)
+                outputs = evaluate(model, data.files, epoch, number_of_process=args.number_of_process)
                 save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
                 correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
                 criterion.cpu()
@@ -394,6 +393,8 @@ def main():
     parser.add_argument("--log_dir", type=str, required=True)
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--restore_path", type=str)
+
+    parser.add_argument("--number_of_process", type=int, default=4)
 
     args = parser.parse_args()
 

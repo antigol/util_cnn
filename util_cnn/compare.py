@@ -19,6 +19,7 @@ class Arguments:
         self.train_data_path = None
         self.train_csv_path = None
         self.log_dir = None
+        self.number_of_process = None
 
 def main():
     parser = argparse.ArgumentParser()
