@@ -36,6 +36,7 @@ def main():
     parser.add_argument("--log_dir", type=str, required=True)
     parser.add_argument("--model_path", type=str, nargs="+", required=True)
     parser.add_argument("--repeat", type=int, required=True)
+    parser.add_argument("--number_of_process", type=int, default=4)
 
     main_args = parser.parse_args()
 
@@ -55,6 +56,7 @@ def main():
     # args.gpu = main_args.gpu
     args.eval_data_path = main_args.eval_data_path
     args.eval_csv_path = main_args.eval_csv_path
+    args.number_of_process = main_args.number_of_process
     args.restore_path = None
 
     assert len(main_args.train_csv_path) == len(main_args.train_data_path)
@@ -65,8 +67,8 @@ def main():
 
     print(train_names)
 
-    xxx = []
-    yyy = []
+    # xxx = []
+    # yyy = []
     for model in main_args.model_path:
         args.model_path = model
 
@@ -90,36 +92,41 @@ def main():
                 train(args)
 
                 x.append(np.load(os.path.join(args.log_dir, "statistics_train.npy")))
-                y.append(np.load(os.path.join(args.log_dir, "statistics_eval.npy")))
+
+                # fix to be removed asap
+                xr = np.load(os.path.join(args.log_dir, "statistics_eval.npy"))
+                if xr.shape[2] == 2:
+                    xr = np.stack([xr[:,:,0], [[0]*xr.shape[1]], xr[:,:,1]], axis=2)
+                y.append(xr)
             xx.append(x)
             yy.append(y)
 
             np.save(os.path.join(model_dir, "statistics_train.npy"), np.array(xx))
             np.save(os.path.join(model_dir, "statistics_eval.npy"), np.array(yy))
 
-        xx = np.array(xx) # [repeat, train_type,           row, column]
-        yy = np.array(yy) # [repeat, train_type, val_type, row, column]
+        # xx = np.array(xx) # [repeat, train_type,           row, column]
+        # yy = np.array(yy) # [repeat, train_type, val_type, row, column]
 
-        xxx.append(xx)
-        yyy.append(yy)
+        # xxx.append(xx)
+        # yyy.append(yy)
 
-    xxx = np.array(xxx) # [model, repeat, train_type,           row, column]
-    yyy = np.array(yyy) # [model, repeat, train_type, val_type, row, column]
+    # xxx = np.array(xxx) # [model, repeat, train_type,           row, column]
+    # yyy = np.array(yyy) # [model, repeat, train_type, val_type, row, column]
 
     # np.save(os.path.join(main_args.log_dir, "statistics_train.npy"), xxx)
     # np.save(os.path.join(main_args.log_dir, "statistics_eval.npy"), yyy)
 
-    if yyy.shape[-1] > 0:
-        eval_accuracies = np.mean(yyy, axis=1)[:, :, :, -1, 2] # [model, train_type, val_type]
-        eval_accuracies_std = np.std(yyy, axis=1)[:, :, :, -1, 2] # [model, train_type, val_type]
-
-        for i, model in enumerate(main_args.model_path):
-            name = os.path.splitext(os.path.basename(model))[0]
-
-            for j, trian_name in enumerate(train_names):
-                print(name, trian_name)
-                for mean, std in zip(eval_accuracies[i][j], eval_accuracies_std[i][j]):
-                    print("Accuracy = {} +- {}".format(mean, std))
+    # if yyy.shape[-1] > 0:
+    #     eval_accuracies = np.mean(yyy, axis=1)[:, :, :, -1, 2] # [model, train_type, val_type]
+    #     eval_accuracies_std = np.std(yyy, axis=1)[:, :, :, -1, 2] # [model, train_type, val_type]
+    #
+    #     for i, model in enumerate(main_args.model_path):
+    #         name = os.path.splitext(os.path.basename(model))[0]
+    #
+    #         for j, trian_name in enumerate(train_names):
+    #             print(name, trian_name)
+    #             for mean, std in zip(eval_accuracies[i][j], eval_accuracies_std[i][j]):
+    #                 print("Accuracy = {} +- {}".format(mean, std))
 
 def remove_prefix(xs):
     p = os.path.commonprefix(xs)
