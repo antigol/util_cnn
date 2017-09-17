@@ -29,7 +29,7 @@ class ModelBackup(Model):
         self.MAX_LEARNING_RATE = max_learning_rate
 
 
-    def initialize(self, number_of_classes):
+    def initialize(self, **kargs):
         """
         self.cnn and self.optimizer must be created in this function
         """

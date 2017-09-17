@@ -283,7 +283,7 @@ def train(args):
     model_path = shutil.copy2(args.model_path, os.path.join(args.log_dir, "model.py"))
     module = import_module(model_path)
     model = module.MyModel()
-    model.initialize(len(classes))
+    model.initialize(number_of_classes=len(classes))
     cnn = model.get_cnn()
 
     logger.info("There is %d parameters to optimize", sum([x.numel() for x in cnn.parameters()]))

@@ -2,7 +2,7 @@
 import torch
 
 class Model:
-    def initialize(self, number_of_classes):
+    def initialize(self, **kargs):
         pass
 
     def get_cnn(self):
