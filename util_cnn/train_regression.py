@@ -85,6 +85,9 @@ def train_one_epoch(epoch, model, train_files, optimizer, criterion, number_of_p
 
         x, y = queue.get()
 
+        x = torch.FloatTensor(x)
+        y = torch.FloatTensor(y)
+
         x = torch.autograd.Variable(x)
         y = torch.autograd.Variable(y)
 
@@ -106,9 +109,9 @@ def train_one_epoch(epoch, model, train_files, optimizer, criterion, number_of_p
         loss_ = float(loss.data.cpu().numpy())
         losses.append(loss_)
 
-        logger.info("[%d.%.2d|%d/%d] Loss=%.1e <Loss>=%.1e Queue=%d Memory=%s Time=%.2fs",
+        logger.info("[%d.%.2d|%d/%d] RMSE=%.1e <RMSE>=%.1e Queue=%d Memory=%s Time=%.2fs",
             epoch, 100 * i // len(train_files), i, len(train_files),
-            loss_, np.mean(losses),
+            loss_ ** 0.5, np.mean(losses) ** 0.5,
             queue.qsize(),
             gpu_memory.format_memory(gpu_memory.used_memory()),
             perf_counter() - t0)
@@ -163,6 +166,10 @@ def evaluate(model, files, epoch=0, number_of_process=1):
     for i in range(0, len(files), bs):
         gc.collect()
         s, x, y = queue.get()
+
+        x = torch.FloatTensor(x)
+        y = torch.FloatTensor(y)
+
         if torch.cuda.is_available():
             x = x.cuda()
 
@@ -176,7 +183,9 @@ def evaluate(model, files, epoch=0, number_of_process=1):
             gpu_memory.format_memory(gpu_memory.used_memory()),
             queue.qsize())
 
+        del s
         del x
+        del y
         del outputs
     event_done.set()
     return np.concatenate(all_outputs, axis=0), np.concatenate(all_targets, axis=0)
@@ -254,6 +263,9 @@ def train(args):
             logger.info("Evalutation with randomly initialized parameters")
         for i, data in enumerate(eval_datas):
             outputs, targets = evaluate(model, data.files, number_of_process=args.number_of_process)
+            save_evaluation(data.ids, outputs, args.log_dir, i)
+            rmse = np.mean((outputs - targets) ** 2) ** 0.5
+            logger.info("Evaluation RMSE = %f", rmse)
         return
 
     ############################################################################
@@ -301,9 +313,9 @@ def train(args):
             for i, (data, stat) in enumerate(zip(eval_datas, statistics_eval)):
                 outputs, targets = evaluate(model, data.files, epoch, number_of_process=args.number_of_process)
                 save_evaluation(data.ids, outputs, args.log_dir, i)
-                loss = np.mean((outputs - targets) ** 2)
-                logger.info("Evaluation Loss = %f", loss)
-                stat.append([epoch, loss])
+                rmse = np.mean((outputs - targets) ** 2) ** 0.5
+                logger.info("Evaluation RMSE = %f", rmse)
+                stat.append([epoch, rmse])
 
     statistics_train = np.array(statistics_train)
     np.save(os.path.join(args.log_dir, "statistics_train.npy"), statistics_train)
