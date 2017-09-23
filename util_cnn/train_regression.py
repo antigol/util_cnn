@@ -13,6 +13,7 @@ import shutil
 from time import perf_counter
 from util_cnn import gpu_memory
 from util_cnn import time_logging
+import IPython
 
 QUEUE_SIZE = 4
 
@@ -283,6 +284,8 @@ def train(args):
     # Training
     statistics_train = []
     statistics_eval = [[] for _ in eval_datas]
+
+    IPython.embed()
 
     for epoch in range(args.start_epoch, args.number_of_epochs):
         time_logging.clear()
