@@ -46,7 +46,7 @@ class ModelBackup(Model):
     def get_optimizer(self):
         return self.optimizer
 
-    def training_done(self, avg_loss, accuracy):
+    def training_done(self, avg_loss):
         '''
         3 possibilities
 

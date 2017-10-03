@@ -40,5 +40,5 @@ class Model:
         y = self.get_cnn()(x)
         return y.data.cpu().numpy()
 
-    def training_done(self, avg_loss, accuracy):
+    def training_done(self, avg_loss):
         pass

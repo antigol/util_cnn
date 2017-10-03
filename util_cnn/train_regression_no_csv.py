@@ -298,7 +298,7 @@ def train(args):
         avg_loss = train_one_epoch(epoch, model, train_data.files, optimizer, criterion, args.number_of_process)
         statistics_train.append([epoch, avg_loss])
 
-        model.training_done(avg_loss, None)
+        model.training_done(avg_loss)
 
         time_logging.end("training epoch", t)
         logger.info("%s", time_logging.text_statistics())

@@ -29,13 +29,13 @@ class Dataset:
         self.ids = ids
         self.labels = labels
 
-def load_data_with_csv(csv_file, files_pattern, classes=None):
+def load_data_with_csv(csv_file, files_pattern):
     labels = {}
 
     with open(csv_file, 'rt') as file:
         reader = csv.reader(file)
         for row in reader:
-            labels[row[0]] = row[1]
+            labels[row[0]] = row[1:]
 
     files = glob.glob(files_pattern)
     random.shuffle(files)
@@ -45,12 +45,9 @@ def load_data_with_csv(csv_file, files_pattern, classes=None):
     # keep only files that appears in the csv
     files, ids = zip(*[(f, i) for f, i in zip(files, ids) if i in labels])
 
-    labels = [labels[i] for i in ids]
-    if classes is None:
-        classes = sorted(set(labels))
-    labels = [classes.index(x) for x in labels]
+    labels = np.array([labels[i] for i in ids], dtype=np.float64)
 
-    return Dataset(files, ids, labels), classes
+    return Dataset(files, ids, labels)
 
 
 def load_data(files_pattern):
@@ -86,10 +83,10 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
                 if s % self.n == self.i:
                     j = min(i + bs, len(train_files))
                     gc.collect()
-                    images = model.load_train_files([train_files[g] for g in indicies[i:j]])
-                    labels = [train_labels[g] for g in indicies[i:j]]
+                    x = model.load_train_files([train_files[g] for g in indicies[i:j]])
+                    y = [train_labels[g] for g in indicies[i:j]]
 
-                    queue.put((images, labels))
+                    queue.put((x, y))
                 s += 1
             event_done.wait()
 
@@ -98,8 +95,6 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         batcher.start()
 
     losses = []
-    total_correct = 0
-    total_trained = 0
 
     cnn.train()
     if torch.cuda.is_available():
@@ -108,24 +103,26 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
     for i in range(0, len(train_files), bs):
         t0 = perf_counter()
         gc.collect()
-        j = min(i + bs, len(train_files))
 
         t = time_logging.start()
 
-        images, labels = queue.get()
+        x, y = queue.get()
 
-        images = torch.autograd.Variable(images)
-        labels = torch.autograd.Variable(torch.LongTensor(labels))
+        x = torch.FloatTensor(x)
+        y = torch.FloatTensor(y)
+
+        x = torch.autograd.Variable(x)
+        y = torch.autograd.Variable(y)
 
         if torch.cuda.is_available():
-            images = images.cuda()
-            labels = labels.cuda()
+            x = x.cuda()
+            y = y.cuda()
 
         t = time_logging.end("batch", t)
 
         optimizer.zero_grad()
-        outputs = cnn(images)
-        loss = criterion(outputs, labels)
+        outputs = cnn(x)
+        loss = criterion(outputs, y)
         t = time_logging.end("forward", t)
         loss.backward()
         optimizer.step()
@@ -134,25 +131,21 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
 
         loss_ = float(loss.data.cpu().numpy())
         losses.append(loss_)
-        correct = sum(outputs.data.cpu().numpy().argmax(-1) == labels.data.cpu().numpy())
-        total_correct += correct
-        total_trained += j - i
 
-        logger.info("[%d.%.2d|%d/%d] Loss=%.1e <Loss>=%.1e Accuracy=%d/%d <Accuracy>=%.2f%% Queue=%d Memory=%s Time=%.2fs",
+        logger.info("[%d.%.2d|%d/%d] RMSE=%.1e <RMSE>=%.1e Queue=%d Memory=%s Time=%.2fs",
             epoch, 100 * i // len(train_files), i, len(train_files),
-            loss_, np.mean(losses),
-            correct, j-i, 100 * total_correct / total_trained,
+            loss_ ** 0.5, np.mean(losses) ** 0.5,
             queue.qsize(),
             gpu_memory.format_memory(gpu_memory.used_memory()),
             perf_counter() - t0)
 
-        del images
-        del labels
+        del x
+        del y
         del outputs
         del loss
 
     event_done.set()
-    return (np.mean(losses), total_correct / total_trained)
+    return np.mean(losses) ** 0.5
 
 
 def evaluate(model, files, epoch=0, number_of_process=1):
@@ -176,9 +169,9 @@ def evaluate(model, files, epoch=0, number_of_process=1):
                 if s % self.n == self.i:
                     j = min(i + bs, len(files))
                     gc.collect()
-                    images = model.load_eval_files(files[i:j])
+                    x = model.load_eval_files(files[i:j])
 
-                    queue.put((s, images))
+                    queue.put((s, x))
                 s += 1
             event_done.wait()
 
@@ -194,11 +187,14 @@ def evaluate(model, files, epoch=0, number_of_process=1):
 
     for i in range(0, len(files), bs):
         gc.collect()
-        s, images = queue.get()
-        if torch.cuda.is_available():
-            images = images.cuda()
+        s, x = queue.get()
 
-        outputs = model.evaluate(images)
+        x = torch.FloatTensor(x)
+
+        if torch.cuda.is_available():
+            x = x.cuda()
+
+        outputs = model.evaluate(x)
 
         all_outputs[s] = outputs
 
@@ -207,7 +203,8 @@ def evaluate(model, files, epoch=0, number_of_process=1):
             gpu_memory.format_memory(gpu_memory.used_memory()),
             queue.qsize())
 
-        del images
+        del s
+        del x
         del outputs
     event_done.set()
     return np.concatenate(all_outputs, axis=0)
@@ -215,7 +212,7 @@ def evaluate(model, files, epoch=0, number_of_process=1):
 
 def save_evaluation(eval_ids, logits, labels, log_dir, number):
     if labels is None:
-        labels = [-1] * len(logits)
+        labels = [-1.0] * len(logits)
 
     logits = np.array(logits)
     labels = np.array(labels)
@@ -225,7 +222,7 @@ def save_evaluation(eval_ids, logits, labels, log_dir, number):
         writer = csv.writer(file)
 
         for i, label, ilogits in zip(eval_ids, labels, logits):
-            writer.writerow([i, label] + list(ilogits))
+            writer.writerow([i] + list(label) + list(ilogits))
 
     logging.getLogger("trainer").info("Evaluation saved into %s", filename)
 
@@ -250,22 +247,20 @@ def train(args):
 
     ############################################################################
     # Files and labels
-    classes = None
-
     train_data = None
     eval_datas = []
 
     if args.train_csv_path is not None or args.train_data_path is not None:
-        train_data, classes = load_data_with_csv(args.train_csv_path, args.train_data_path, classes)
-        logger.info("%s=%d training files", "+".join([str(train_data.labels.count(x)) for x in set(train_data.labels)]), len(train_data.files))
+        train_data = load_data_with_csv(args.train_csv_path, args.train_data_path)
+        logger.info("%d training files", len(train_data.files))
 
     if args.eval_data_path is not None and args.eval_csv_path is not None:
         assert len(args.eval_data_path) == len(args.eval_csv_path)
 
         for csv_file, pattern in zip(args.eval_csv_path, args.eval_data_path):
-            eval_data, classes = load_data_with_csv(csv_file, pattern, classes)
+            eval_data = load_data_with_csv(csv_file, pattern)
             eval_datas.append(eval_data)
-            logger.info("%s=%d evaluation files", "+".join([str(eval_data.labels.count(x)) for x in set(eval_data.labels)]), len(eval_data.files))
+            logger.info("%d evaluation files", len(eval_data.files))
     elif args.eval_data_path is not None and args.eval_csv_path is None:
         for pattern in args.eval_data_path:
             eval_data = load_data(pattern)
@@ -276,15 +271,12 @@ def train(args):
     else:
         raise AssertionError("eval_data_path or eval_csv_path missing ?")
 
-    if args.number_of_classes is not None and classes is None:
-        classes = list(range(args.number_of_classes))
-
     ############################################################################
     # Import model
     model_path = shutil.copy2(args.model_path, os.path.join(args.log_dir, "model.py"))
     module = import_module(model_path)
     model = module.MyModel()
-    model.initialize(number_of_classes=len(classes))
+    model.initialize()
     cnn = model.get_cnn()
 
     logger.info("There is %d parameters to optimize", sum([x.numel() for x in cnn.parameters()]))
@@ -306,9 +298,8 @@ def train(args):
         for i, data in enumerate(eval_datas):
             outputs = evaluate(model, data.files, number_of_process=args.number_of_process)
             save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
-            if data.labels is not None:
-                correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
-                logger.info("%d / %d = %.2f%%", correct, len(data.labels), 100 * correct / len(data.labels))
+            rmse = np.mean((outputs - data.labels) ** 2) ** 0.5
+            logger.info("Evaluation RMSE = %f", rmse)
         return
 
     ############################################################################
@@ -337,10 +328,10 @@ def train(args):
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
 
-        avg_loss, accuracy = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, criterion, args.number_of_process)
-        statistics_train.append([epoch, avg_loss, accuracy])
+        rmse = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, criterion, args.number_of_process)
+        statistics_train.append([epoch, rmse])
 
-        model.training_done(avg_loss)
+        model.training_done(rmse)
 
         time_logging.end("training epoch", t)
         logger.info("%s", time_logging.text_statistics())
@@ -358,20 +349,9 @@ def train(args):
             for i, (data, stat) in enumerate(zip(eval_datas, statistics_eval)):
                 outputs = evaluate(model, data.files, epoch, number_of_process=args.number_of_process)
                 save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
-                correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
-                criterion.cpu()
-                loss = criterion(
-                    torch.autograd.Variable(torch.FloatTensor(outputs)),
-                    torch.autograd.Variable(torch.LongTensor(data.labels))
-                    ).data[0]
-                if torch.cuda.is_available():
-                    criterion.cuda()
-                logger.info("Evaluation accuracy %d / %d = %.2f%%, Loss = %1e",
-                    correct,
-                    len(data.labels), 100 * correct / len(data.labels),
-                    loss
-                    )
-                stat.append([epoch, loss, correct / len(data.labels)])
+                rmse = np.mean((outputs - data.labels) ** 2) ** 0.5
+                logger.info("Evaluation RMSE = %f", rmse)
+                stat.append([epoch, rmse])
 
     statistics_train = np.array(statistics_train)
     np.save(os.path.join(args.log_dir, "statistics_train.npy"), statistics_train)
@@ -390,9 +370,6 @@ def main():
     parser.add_argument("--eval_csv_path", type=str, nargs="+")
     parser.add_argument("--eval_each", type=int, default=1)
 
-    parser.add_argument("--number_of_classes", type=int)
-
-    # parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument("--log_dir", type=str, required=True)
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--restore_path", type=str)
