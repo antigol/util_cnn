@@ -1,5 +1,6 @@
 #pylint: disable=C,R,E1101
 import torch
+import random
 
 class Model:
     def initialize(self, **kargs):
@@ -13,6 +14,14 @@ class Model:
 
     def get_batch_size(self, epoch=None):
         raise NotImplementedError
+
+    def create_train_batches(self, epoch, files, labels): #pylint: disable=W0613
+        bs = self.get_batch_size(epoch)
+
+        indices = list(range(len(files)))
+        random.shuffle(indices)
+
+        return [indices[i: i + bs] for i in range(0, len(files), bs)]
 
     def get_learning_rate(self, epoch):
         raise NotImplementedError

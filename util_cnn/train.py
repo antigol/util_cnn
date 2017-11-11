@@ -64,11 +64,9 @@ def load_data(files_pattern):
 
 def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion, number_of_process):
     cnn = model.get_cnn()
-    bs = model.get_batch_size(epoch)
     logger = logging.getLogger("trainer")
 
-    indicies = list(range(len(train_files)))
-    random.shuffle(indicies)
+    batches = model.create_train_batches(epoch, train_files, train_labels)
 
     queue = torch.multiprocessing.Queue(maxsize=QUEUE_SIZE)
     event_done = torch.multiprocessing.Event()
@@ -80,17 +78,14 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
             self.i = i
 
         def run(self):
-            s = 0
-
-            for i in range(0, len(train_files), bs):
+            for s, indices in enumerate(batches):
                 if s % self.n == self.i:
-                    j = min(i + bs, len(train_files))
                     gc.collect()
-                    x = model.load_train_files([train_files[g] for g in indicies[i:j]])
-                    y = [train_labels[g] for g in indicies[i:j]]
+                    x = model.load_train_files([train_files[g] for g in indices])
+                    y = [train_labels[g] for g in indices]
 
                     queue.put((x, y))
-                s += 1
+
             event_done.wait()
 
     for i in range(number_of_process):
@@ -105,10 +100,9 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
     if torch.cuda.is_available():
         cnn.cuda()
 
-    for i in range(0, len(train_files), bs):
+    for s, batch in enumerate(batches):
         t0 = perf_counter()
         gc.collect()
-        j = min(i + bs, len(train_files))
 
         t = time_logging.start()
 
@@ -139,12 +133,12 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         losses.append(loss_)
         correct = sum(outputs.data.cpu().numpy().argmax(-1) == y.data.cpu().numpy())
         total_correct += correct
-        total_trained += j - i
+        total_trained += len(batch)
 
         logger.info("[%d.%.2d|%d/%d] Loss=%.1e <Loss>=%.1e Accuracy=%d/%d <Accuracy>=%.2f%% Queue=%d Memory=%s Time=%.2fs",
-            epoch, 100 * i // len(train_files), i, len(train_files),
+            epoch, 100 * s // len(batches), s, len(batches),
             loss_, np.mean(losses),
-            correct, j-i, 100 * total_correct / total_trained,
+            correct, len(batch), 100 * total_correct / total_trained,
             queue.qsize(),
             gpu_memory.format_memory(gpu_memory.used_memory()),
             perf_counter() - t0)
