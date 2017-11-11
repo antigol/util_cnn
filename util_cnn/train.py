@@ -137,7 +137,7 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
 
         loss_ = float(loss.data.cpu().numpy())
         losses.append(loss_)
-        correct = sum(outputs.data.cpu().numpy().argmax(-1) == labels.data.cpu().numpy())
+        correct = sum(outputs.data.cpu().numpy().argmax(-1) == y.data.cpu().numpy())
         total_correct += correct
         total_trained += j - i
 
