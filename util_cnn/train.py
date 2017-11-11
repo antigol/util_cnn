@@ -86,10 +86,10 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
                 if s % self.n == self.i:
                     j = min(i + bs, len(train_files))
                     gc.collect()
-                    images = model.load_train_files([train_files[g] for g in indicies[i:j]])
-                    labels = [train_labels[g] for g in indicies[i:j]]
+                    x = model.load_train_files([train_files[g] for g in indicies[i:j]])
+                    y = [train_labels[g] for g in indicies[i:j]]
 
-                    queue.put((images, labels))
+                    queue.put((x, y))
                 s += 1
             event_done.wait()
 
@@ -112,20 +112,23 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
 
         t = time_logging.start()
 
-        images, labels = queue.get()
+        x, y = queue.get()
 
-        images = torch.autograd.Variable(images)
-        labels = torch.autograd.Variable(torch.LongTensor(labels))
+        x = torch.FloatTensor(x)
+        y = torch.LongTensor(y)
+
+        x = torch.autograd.Variable(x)
+        y = torch.autograd.Variable(y)
 
         if torch.cuda.is_available():
-            images = images.cuda()
-            labels = labels.cuda()
+            x = x.cuda()
+            y = y.cuda()
 
         t = time_logging.end("batch", t)
 
         optimizer.zero_grad()
-        outputs = cnn(images)
-        loss = criterion(outputs, labels)
+        outputs = cnn(x)
+        loss = criterion(outputs, y)
         t = time_logging.end("forward", t)
         loss.backward()
         optimizer.step()
@@ -146,8 +149,8 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
             gpu_memory.format_memory(gpu_memory.used_memory()),
             perf_counter() - t0)
 
-        del images
-        del labels
+        del x
+        del y
         del outputs
         del loss
 
@@ -176,9 +179,9 @@ def evaluate(model, files, epoch=0, number_of_process=1):
                 if s % self.n == self.i:
                     j = min(i + bs, len(files))
                     gc.collect()
-                    images = model.load_eval_files(files[i:j])
+                    x = model.load_eval_files(files[i:j])
 
-                    queue.put((s, images))
+                    queue.put((s, x))
                 s += 1
             event_done.wait()
 
@@ -194,11 +197,14 @@ def evaluate(model, files, epoch=0, number_of_process=1):
 
     for i in range(0, len(files), bs):
         gc.collect()
-        s, images = queue.get()
-        if torch.cuda.is_available():
-            images = images.cuda()
+        s, x = queue.get()
 
-        outputs = model.evaluate(images)
+        x = torch.FloatTensor(x)
+
+        if torch.cuda.is_available():
+            x = x.cuda()
+
+        outputs = model.evaluate(x)
 
         all_outputs[s] = outputs
 
@@ -207,7 +213,8 @@ def evaluate(model, files, epoch=0, number_of_process=1):
             gpu_memory.format_memory(gpu_memory.used_memory()),
             queue.qsize())
 
-        del images
+        del s
+        del x
         del outputs
     event_done.set()
     return np.concatenate(all_outputs, axis=0)
@@ -392,7 +399,6 @@ def main():
 
     parser.add_argument("--number_of_classes", type=int)
 
-    # parser.add_argument("--gpu", type=int, default=0)
     parser.add_argument("--log_dir", type=str, required=True)
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--restore_path", type=str)
