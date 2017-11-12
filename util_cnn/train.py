@@ -134,7 +134,7 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         if outputs.size(-1) > 1:
             correct = sum(outputs.data.cpu().numpy().argmax(-1) == y.data.cpu().numpy())
         else:
-            correct = sum(np.sign(outputs.data.cpu().numpy()) == 2 * y.data.cpu().numpy() - 1)
+            correct = np.sum(np.sign(outputs.data.cpu().numpy().reshape((-1,))) == 2 * y.data.cpu().numpy() - 1)
         total_correct += correct
         total_trained += len(batch)
 
@@ -314,7 +314,7 @@ def train(args):
                 if outputs.shape[-1] > 1:
                     correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
                 else:
-                    correct = np.sum(np.sign(outputs) == 2 * np.array(data.labels, np.int64) - 1)
+                    correct = np.sum(np.sign(outputs).reshape((-1,)) == 2 * np.array(data.labels, np.int64) - 1)
 
                 logger.info("%d / %d = %.2f%%", correct, len(data.labels), 100 * correct / len(data.labels))
         return
@@ -369,7 +369,7 @@ def train(args):
                 if outputs.shape[-1] > 1:
                     correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
                 else:
-                    correct = np.sum(np.sign(outputs) == 2 * np.array(data.labels, np.int64) - 1)
+                    correct = np.sum(np.sign(outputs).reshape((-1,)) == 2 * np.array(data.labels, np.int64) - 1)
 
                 criterion.cpu()
                 loss = criterion(
