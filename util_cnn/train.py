@@ -131,7 +131,10 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
 
         loss_ = float(loss.data.cpu().numpy())
         losses.append(loss_)
-        correct = sum(outputs.data.cpu().numpy().argmax(-1) == y.data.cpu().numpy())
+        if outputs.size(-1) > 1:
+            correct = sum(outputs.data.cpu().numpy().argmax(-1) == y.data.cpu().numpy())
+        else:
+            correct = sum(np.sign(outputs.data.cpu().numpy()) == 2 * y.data.cpu().numpy() - 1)
         total_correct += correct
         total_trained += len(batch)
 
@@ -308,7 +311,11 @@ def train(args):
             outputs = evaluate(model, data.files, number_of_process=args.number_of_process)
             save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
             if data.labels is not None:
-                correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
+                if outputs.shape[-1] > 1:
+                    correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
+                else:
+                    correct = np.sum(np.sign(outputs) == 2 * np.array(data.labels, np.int64) - 1)
+
                 logger.info("%d / %d = %.2f%%", correct, len(data.labels), 100 * correct / len(data.labels))
         return
 
@@ -359,7 +366,11 @@ def train(args):
             for i, (data, stat) in enumerate(zip(eval_datas, statistics_eval)):
                 outputs = evaluate(model, data.files, epoch, number_of_process=args.number_of_process)
                 save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
-                correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
+                if outputs.shape[-1] > 1:
+                    correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
+                else:
+                    correct = np.sum(np.sign(outputs) == 2 * np.array(data.labels, np.int64) - 1)
+
                 criterion.cpu()
                 loss = criterion(
                     torch.autograd.Variable(torch.FloatTensor(outputs)),
