@@ -26,6 +26,9 @@ class Model:
     def get_learning_rate(self, epoch):
         raise NotImplementedError
 
+    def number_of_epochs(self):
+        raise NotImplementedError
+
     def get_optimizer(self):
         return torch.optim.Adam(self.get_cnn().parameters())
 

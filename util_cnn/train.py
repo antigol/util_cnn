@@ -335,9 +335,14 @@ def train(args):
     statistics_train = []
     statistics_eval = [[] for _ in eval_datas]
 
+    if args.number_of_epochs is not None:
+        number_of_epochs = args.number_of_epochs
+    else:
+        number_of_epochs = model.number_of_epochs()
+
     IPython.embed()
 
-    for epoch in range(args.start_epoch, args.number_of_epochs):
+    for epoch in range(args.start_epoch, number_of_epochs):
         time_logging.clear()
         t = time_logging.start()
 
