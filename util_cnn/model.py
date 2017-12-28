@@ -21,7 +21,7 @@ class Model:
         indices = list(range(len(files)))
         random.shuffle(indices)
 
-        return [indices[i: i + bs] for i in range(0, len(files), bs)]
+        return [[(files[j], labels[j]) for j in indices[i: i + bs]] for i in range(0, len(files), bs)]
 
     def get_learning_rate(self, epoch):
         raise NotImplementedError
@@ -35,17 +35,23 @@ class Model:
     def get_criterion(self):
         return torch.nn.CrossEntropyLoss()
 
-    def load_train_files(self, files):
-        return self.load_files(files)
+    def get_train_criterion(self):
+        return self.get_criterion()
 
     def load_eval_files(self, files):
-        return self.load_files(files)
-
-    def load_files(self, files):
         """
         Returns a torch.FloatTensor
         """
         raise NotImplementedError
+
+    def load_train_batch(self, batch):
+        """
+        :param: batch : a list of things that ceate a batch
+        :return: (images, labels)
+        """
+        x = self.load_eval_files([f for f, l in batch])
+        y = torch.LongTensor([l for f, l in batch])
+        return x, y
 
     def evaluate(self, x):
         x = torch.autograd.Variable(x, volatile=True)
