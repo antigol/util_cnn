@@ -107,9 +107,6 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
 
         x, y = queue.get()
 
-        # x = torch.FloatTensor(x)
-        # y = torch.LongTensor(y)
-
         x = torch.autograd.Variable(x)
         y = torch.autograd.Variable(y)
 
@@ -157,9 +154,9 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
     return (np.mean(losses), total_correct / total_trained)
 
 
-def evaluate(model, files, epoch=0, number_of_process=1):
+def evaluate(model, files, epoch=-1, number_of_process=1):
     cnn = model.get_cnn()
-    bs = model.get_batch_size()
+    bs = model.get_batch_size(epoch)
     logger = logging.getLogger("trainer")
 
     queue = torch.multiprocessing.Queue(maxsize=QUEUE_SIZE)
@@ -197,8 +194,6 @@ def evaluate(model, files, epoch=0, number_of_process=1):
     for i in range(0, len(files), bs):
         gc.collect()
         s, x = queue.get()
-
-        x = torch.FloatTensor(x)
 
         if torch.cuda.is_available():
             x = x.cuda()
