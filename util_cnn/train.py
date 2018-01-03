@@ -385,10 +385,8 @@ def train(args):
                     )
                 stat.append([epoch, loss, correct / len(data.labels)])
 
-    statistics_train = np.array(statistics_train)
-    np.save(os.path.join(args.log_dir, "statistics_train.npy"), statistics_train)
-    statistics_eval = np.array(statistics_eval)
-    np.save(os.path.join(args.log_dir, "statistics_eval.npy"), statistics_eval)
+        np.save(os.path.join(args.log_dir, "statistics_train.npy"), np.array(statistics_train))
+        np.save(os.path.join(args.log_dir, "statistics_eval.npy"), np.array(statistics_eval))
 
 def main():
     parser = argparse.ArgumentParser()
