@@ -305,7 +305,15 @@ def train(args):
         if args.restore_path is None:
             logger.info("Evalutation with randomly initialized parameters")
         for i, data in enumerate(eval_datas):
+
+            time_logging.clear()
+            t = time_logging.start()
+
             outputs = evaluate(model, data.files, number_of_process=args.number_of_process)
+
+            time_logging.end("evaluation", t)
+            logger.info("%s", time_logging.text_statistics())
+
             save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
             if data.labels is not None:
                 if outputs.shape[-1] > 1:
@@ -367,7 +375,15 @@ def train(args):
 
         if epoch % args.eval_each == args.eval_each - 1:
             for i, (data, stat) in enumerate(zip(eval_datas, statistics_eval)):
+                time_logging.clear()
+                t = time_logging.start()
+
                 outputs = evaluate(model, data.files, epoch, number_of_process=args.number_of_process)
+
+                time_logging.end("evaluation", t)
+                logger.info("%s", time_logging.text_statistics())
+
+
                 save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
                 if outputs.shape[-1] > 1:
                     correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
