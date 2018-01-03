@@ -12,31 +12,23 @@ class Model:
         """
         raise NotImplementedError
 
-    def get_batch_size(self, epoch=None):
-        raise NotImplementedError
-
-    def create_train_batches(self, epoch, files, labels): #pylint: disable=W0613
-        bs = self.get_batch_size(epoch)
-
-        indices = list(range(len(files)))
-        random.shuffle(indices)
-
-        return [indices[i: i + bs] for i in range(0, len(files), bs)]
-
-    def get_learning_rate(self, epoch):
-        raise NotImplementedError
-
     def get_optimizer(self):
         return torch.optim.Adam(self.get_cnn().parameters())
+
+    def get_train_criterion(self):
+        return self.get_criterion()
 
     def get_criterion(self):
         return torch.nn.CrossEntropyLoss()
 
-    def load_train_files(self, files):
-        return self.load_files(files)
+    def get_batch_size(self, epoch):
+        raise NotImplementedError
 
-    def load_eval_files(self, files):
-        return self.load_files(files)
+    def get_learning_rate(self, epoch):
+        raise NotImplementedError
+
+    def number_of_epochs(self):
+        raise NotImplementedError
 
     def load_files(self, files):
         """
@@ -44,10 +36,37 @@ class Model:
         """
         raise NotImplementedError
 
+    def load_eval_files(self, files):
+        """
+        Returns a torch.FloatTensor
+        """
+        return self.load_files(files)
+
     def evaluate(self, x):
+        """
+        Take as input a torch.FloatTensor
+        Returns a numpy.array
+        """
         x = torch.autograd.Variable(x, volatile=True)
         y = self.get_cnn()(x)
         return y.data.cpu().numpy()
+
+    def create_train_batches(self, epoch, files, labels): #pylint: disable=W0613
+        bs = self.get_batch_size(epoch)
+
+        indices = list(range(len(files)))
+        random.shuffle(indices)
+
+        return [[(files[j], labels[j]) for j in indices[i: i + bs]] for i in range(0, len(files), bs)]
+
+    def load_train_batch(self, batch):
+        """
+        :param: batch : a list of things that ceate a batch
+        :return: (images, labels)
+        """
+        x = self.load_files([f for f, l in batch])
+        y = torch.LongTensor([l for f, l in batch])
+        return x, y
 
     def training_done(self, avg_loss):
         pass

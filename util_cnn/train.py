@@ -66,7 +66,7 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
     cnn = model.get_cnn()
     logger = logging.getLogger("trainer")
 
-    batches = model.create_train_batches(epoch, train_files, train_labels)
+    batches = model.create_train_batches(epoch, train_files, train_labels) # list of lists [first batch, second batch, ...]
 
     queue = torch.multiprocessing.Queue(maxsize=QUEUE_SIZE)
     event_done = torch.multiprocessing.Event()
@@ -78,11 +78,10 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
             self.i = i
 
         def run(self):
-            for s, indices in enumerate(batches):
+            for s, batch in enumerate(batches):
                 if s % self.n == self.i:
                     gc.collect()
-                    x = model.load_train_files([train_files[g] for g in indices])
-                    y = [train_labels[g] for g in indices]
+                    x, y = model.load_train_batch(batch)
 
                     queue.put((x, y))
 
@@ -108,9 +107,6 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
 
         x, y = queue.get()
 
-        x = torch.FloatTensor(x)
-        y = torch.LongTensor(y)
-
         x = torch.autograd.Variable(x)
         y = torch.autograd.Variable(y)
 
@@ -132,7 +128,10 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         loss_ = float(loss.data.cpu().numpy())
         losses.append(loss_)
         if outputs.size(-1) > 1:
-            correct = sum(outputs.data.cpu().numpy().argmax(-1) == y.data.cpu().numpy())
+            if y.dim() == 1:
+                correct = sum(outputs.data.cpu().numpy().argmax(-1) == y.data.cpu().numpy())
+            else:
+                correct = sum(outputs.data.cpu().numpy().argmax(-1) == y.data.cpu().numpy().argmax(-1))
         else:
             correct = np.sum(np.sign(outputs.data.cpu().numpy().reshape((-1,))) == 2 * y.data.cpu().numpy() - 1)
         total_correct += correct
@@ -155,9 +154,9 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
     return (np.mean(losses), total_correct / total_trained)
 
 
-def evaluate(model, files, epoch=0, number_of_process=1):
+def evaluate(model, files, epoch=-1, number_of_process=1):
     cnn = model.get_cnn()
-    bs = model.get_batch_size()
+    bs = model.get_batch_size(epoch)
     logger = logging.getLogger("trainer")
 
     queue = torch.multiprocessing.Queue(maxsize=QUEUE_SIZE)
@@ -195,8 +194,6 @@ def evaluate(model, files, epoch=0, number_of_process=1):
     for i in range(0, len(files), bs):
         gc.collect()
         s, x = queue.get()
-
-        x = torch.FloatTensor(x)
 
         if torch.cuda.is_available():
             x = x.cuda()
@@ -323,6 +320,7 @@ def train(args):
     # Optimizer
     optimizer = model.get_optimizer()
     criterion = model.get_criterion()
+    train_criterion = model.get_train_criterion()
     if torch.cuda.is_available():
         criterion.cuda()
 
@@ -335,9 +333,14 @@ def train(args):
     statistics_train = []
     statistics_eval = [[] for _ in eval_datas]
 
+    if args.number_of_epochs is not None:
+        number_of_epochs = args.number_of_epochs
+    else:
+        number_of_epochs = model.number_of_epochs()
+
     IPython.embed()
 
-    for epoch in range(args.start_epoch, args.number_of_epochs):
+    for epoch in range(args.start_epoch, number_of_epochs):
         time_logging.clear()
         t = time_logging.start()
 
@@ -345,7 +348,7 @@ def train(args):
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
 
-        avg_loss, accuracy = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, criterion, args.number_of_process)
+        avg_loss, accuracy = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, train_criterion, args.number_of_process)
         statistics_train.append([epoch, avg_loss, accuracy])
 
         model.training_done(avg_loss)
