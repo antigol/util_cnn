@@ -110,11 +110,13 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
         x = torch.autograd.Variable(x)
         y = torch.autograd.Variable(y)
 
+        t = time_logging.end("load batch", t)
+
         if torch.cuda.is_available():
             x = x.cuda()
             y = y.cuda()
 
-        t = time_logging.end("batch", t)
+        t = time_logging.end("upload batch", t)
 
         optimizer.zero_grad()
         outputs = cnn(x)
@@ -192,13 +194,21 @@ def evaluate(model, files, epoch=-1, number_of_process=1):
     all_outputs = [None] * len(range(0, len(files), bs))
 
     for i in range(0, len(files), bs):
+        t = time_logging.start()
+
         gc.collect()
         s, x = queue.get()
+
+        t = time_logging.end("load batch", t)
 
         if torch.cuda.is_available():
             x = x.cuda()
 
+        t = time_logging.end("upload batch", t)
+
         outputs = model.evaluate(x)
+
+        t = time_logging.end("forward", t)
 
         all_outputs[s] = outputs
 
