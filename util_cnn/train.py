@@ -351,6 +351,11 @@ def train(args):
     statistics_train = []
     statistics_eval = [[] for _ in eval_datas]
 
+    if args.restore_path is not None:
+        statistics_train = list(np.load(os.path.join(args.log_dir, "statistics_train.npy")))
+        statistics_eval = [list(x) for x in np.load(os.path.join(args.log_dir, "statistics_eval.npy"))]
+        logger.info("Restoration from numpy statistics files")
+
     if args.number_of_epochs is not None:
         number_of_epochs = args.number_of_epochs
     else:
