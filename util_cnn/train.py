@@ -15,8 +15,6 @@ from util_cnn import gpu_memory
 from util_cnn import time_logging
 import IPython
 
-QUEUE_SIZE = 4
-
 def import_module(path):
     file_name = os.path.basename(path)
     model_name = file_name.split('.')[0]
@@ -62,13 +60,13 @@ def load_data(files_pattern):
     return Dataset(files, ids, None)
 
 
-def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion, number_of_process):
+def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterion, number_of_process, queue_size):
     cnn = model.get_cnn()
     logger = logging.getLogger("trainer")
 
     batches = model.create_train_batches(epoch, train_files, train_labels) # list of lists [first batch, second batch, ...]
 
-    queue = torch.multiprocessing.Queue(maxsize=QUEUE_SIZE)
+    queue = torch.multiprocessing.Queue(maxsize=queue_size)
     event_done = torch.multiprocessing.Event()
 
     class Batcher(torch.multiprocessing.Process):
@@ -156,12 +154,12 @@ def train_one_epoch(epoch, model, train_files, train_labels, optimizer, criterio
     return (np.mean(losses), total_correct / total_trained)
 
 
-def evaluate(model, files, epoch=-1, number_of_process=1):
+def evaluate(model, files, epoch, number_of_process, queue_size):
     cnn = model.get_cnn()
     bs = model.get_batch_size(epoch)
     logger = logging.getLogger("trainer")
 
-    queue = torch.multiprocessing.Queue(maxsize=QUEUE_SIZE)
+    queue = torch.multiprocessing.Queue(maxsize=queue_size)
     event_done = torch.multiprocessing.Event()
 
     class Batcher(torch.multiprocessing.Process):
@@ -319,7 +317,7 @@ def train(args):
             time_logging.clear()
             t = time_logging.start()
 
-            outputs = evaluate(model, data.files, number_of_process=args.number_of_process)
+            outputs = evaluate(model, data.files, -1, args.number_of_process, args.queue_size)
 
             time_logging.end("evaluation", t)
             logger.info("%s", time_logging.text_statistics())
@@ -371,7 +369,7 @@ def train(args):
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
 
-        avg_loss, accuracy = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, train_criterion, args.number_of_process)
+        avg_loss, accuracy = train_one_epoch(epoch, model, train_data.files, train_data.labels, optimizer, train_criterion, args.number_of_process, args.queue_size)
         statistics_train.append([epoch, avg_loss, accuracy])
 
         model.training_done(avg_loss)
@@ -393,7 +391,7 @@ def train(args):
                 time_logging.clear()
                 t = time_logging.start()
 
-                outputs = evaluate(model, data.files, epoch, number_of_process=args.number_of_process)
+                outputs = evaluate(model, data.files, epoch, args.number_of_process, args.queue_size)
 
                 time_logging.end("evaluation", t)
                 logger.info("%s", time_logging.text_statistics())
@@ -440,7 +438,8 @@ def main():
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--restore_path", type=str)
 
-    parser.add_argument("--number_of_process", type=int, default=4)
+    parser.add_argument("--number_of_process", type=int, default=1)
+    parser.add_argument("--queue_size", type=int, default=4)
 
     args = parser.parse_args()
 
