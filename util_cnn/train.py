@@ -396,26 +396,27 @@ def train(args):
                 time_logging.end("evaluation", t)
                 logger.info("%s", time_logging.text_statistics())
 
-
                 save_evaluation(data.ids, outputs, data.labels, args.log_dir, i)
-                if outputs.shape[-1] > 1:
-                    correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
-                else:
-                    correct = np.sum(np.sign(outputs).reshape((-1,)) == 2 * np.array(data.labels, np.int64) - 1)
 
-                criterion.cpu()
-                loss = criterion(
-                    torch.autograd.Variable(torch.FloatTensor(outputs)),
-                    torch.autograd.Variable(torch.LongTensor(data.labels))
-                    ).data[0]
-                if torch.cuda.is_available():
-                    criterion.cuda()
-                logger.info("Evaluation accuracy %d / %d = %.2f%%, Loss = %1e",
-                    correct,
-                    len(data.labels), 100 * correct / len(data.labels),
-                    loss
-                    )
-                stat.append([epoch, loss, correct / len(data.labels)])
+                if data.labels is not None:
+                    if outputs.shape[-1] > 1:
+                        correct = np.sum(np.argmax(outputs, axis=1) == np.array(data.labels, np.int64))
+                    else:
+                        correct = np.sum(np.sign(outputs).reshape((-1,)) == 2 * np.array(data.labels, np.int64) - 1)
+
+                    criterion.cpu()
+                    loss = criterion(
+                        torch.autograd.Variable(torch.FloatTensor(outputs)),
+                        torch.autograd.Variable(torch.LongTensor(data.labels))
+                        ).data[0]
+                    if torch.cuda.is_available():
+                        criterion.cuda()
+                    logger.info("Evaluation accuracy %d / %d = %.2f%%, Loss = %1e",
+                        correct,
+                        len(data.labels), 100 * correct / len(data.labels),
+                        loss
+                        )
+                    stat.append([epoch, loss, correct / len(data.labels)])
 
         np.save(os.path.join(args.log_dir, "statistics_train.npy"), np.array(statistics_train))
         np.save(os.path.join(args.log_dir, "statistics_eval.npy"), np.array(statistics_eval))
