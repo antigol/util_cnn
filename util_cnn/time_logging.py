@@ -1,15 +1,12 @@
-#pylint: disable=W0603,W0602
-import torch
+#pylint: disable=C,W0603
 from time import perf_counter
+import torch
 
 DATA_TIMES = {}
-TOTAL_TIME = 0
 
 def clear():
     global DATA_TIMES
-    global TOTAL_TIME
     DATA_TIMES = {}
-    TOTAL_TIME = start()
 
 def start():
     if torch.cuda.is_available():
@@ -32,9 +29,9 @@ def end(name, begin_time):
 
 def text_statistics():
     text = "[time logging] ...............unit is seconds... [tot time]/ [nbr] = [per call] [percent]\n"
-    total = start() - TOTAL_TIME
+    total = max(sum(times) for _, times in DATA_TIMES.items())
 
-    for name, times in sorted(DATA_TIMES.items()):
+    for name, times in sorted(DATA_TIMES.items(), key=lambda x: sum(x[1]), reverse=True):
         text += "[time logging] {:.<30}... {: >9.3} / {: <5} = {: <10.3} {}%\n".format(
             name, sum(times),
             len(times), sum(times) / len(times),
